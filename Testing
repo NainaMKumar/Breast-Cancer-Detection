@@ -1,0 +1,6 @@
+def test_model(model, x_val):
+    loss, accuracy = model.evaluate(x_val)
+    print(f"ValidationLoss: {loss:.4f}, Validation Accuracy:{accuracy:.4f}")
+    return loss, accuracy
+    
+test_model(my_model, valid_ds)
