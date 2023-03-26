@@ -1,0 +1,130 @@
+image = io.imread('/kaggle/input/rsna-mammography-images-as-pngs/images_as_pngs/train_images_processed/10006/1459541791.png')
+channels = image.shape[-1] if image.ndim == 3 else 1
+print(channels)
+
+class_cancer = d_train['cancer'].value_counts()[1]
+class_no_cancer = d_train['cancer'].value_counts()[0]
+
+fig = px.bar(d_train, x=["cancer", "no cancer"], y=[class_cancer,class_no_cancer], color=["Cancer", "No cancer"],
+    labels=dict(x="Diagnosis", y="Number of patients", color="Key")
+)
+fig.show()
+
+imageFilesDir = '/kaggle/input/rsna-mammography-images-as-pngs/images_as_pngs/train_images_processed'
+files = list(glob(os.path.join(imageFilesDir, "**", "*.png")))
+
+def tf_open_img(img_path, n_channels=3, resize_to=None):
+    
+    # Load the raw data from the file
+    img = tf.io.read_file(img_path)
+    
+    # Decode the PNG image to a uint8 tensor
+    img = tf.image.decode_png(img, channels=n_channels)
+    
+    # Resize the image to 224x224
+    if resize_to is not None:
+        img = tf.image.resize(img, size=(resize_to, resize_to))
+    
+    # Convert the pixel values to float between 0 and 1
+    img = tf.cast(img, tf.float32) / 255.0
+    
+    return img
+
+plt.imshow(tf_open_img(files[0], resize_to=224))
+
+# number of subprocesses to use for data loading
+num_workers = 0
+
+# how many samples per batch to load
+batch_size = 32 # [1,2,4,8,16,32,64,128,256] 
+
+# percentage of training set to use as validation
+valid_size = 0.2
+
+#VISUALIZE A BATCH OF TRAINING DATA
+# Define classes
+classes   = ['no_cancer', 'cancer']
+class_s2i = {k:i for i,k in enumerate(classes)} # cancer --> 1
+class_i2s = {i:k for i,k in enumerate(classes)} # 0 --> no_cancer
+encoder = lambda x: class_s2i.get(x)
+decoder = lambda x: class_i2s.get(x)
+
+# train/val split
+num_train = len(files)
+
+indices = list(range(num_train))
+np.random.shuffle(indices)
+
+split = int(valid_size * num_train)
+train_idx, valid_idx     = np.array(indices[split:]), np.array(indices[:split])
+train_files, valid_files = np.array(files)[train_idx], np.array(files)[valid_idx]
+(len(train_files), len(valid_files))
+
+print(train_files)
+
+# Get map from img_id to cancer
+train_img_id_to_cancer = d_train.groupby("image_id")["cancer"].first().to_dict()
+
+train_y = np.array([
+    train_img_id_to_cancer[int(f_path.rsplit("/", 1)[-1][:-4])]
+    for f_path in train_files
+])
+valid_y = np.array([
+    train_img_id_to_cancer[int(f_path.rsplit("/", 1)[-1][:-4])]
+    for f_path in valid_files
+])
+
+train_y.shape, valid_y.shape
+train_y
+
+demo_idx = 5
+
+def plot_example(f_path, lbl, _figsize=(12,12)):
+    img = tf_open_img(f_path)
+    lbl_str = decoder(lbl)
+    
+    plt.figure(figsize=(_figsize))
+    plt.title(f"Label: {lbl_str}", fontweight="bold")
+    plt.imshow(img)
+    plt.axis(False)
+    plt.show()
+    
+
+plot_example(train_files[demo_idx], train_y[demo_idx], (10,10))
+
+def batch_data_generator(file_arr, lbl_arr, batch_size=8, load_images=True):
+    n_ex = file_arr.shape[0]
+    for i in range(0, n_ex, batch_size):
+        x_batch = file_arr[i:i+batch_size]
+        y_batch  = lbl_arr[i:i+batch_size]
+        if load_images:
+            x_batch = np.stack([tf_open_img(f_path) for f_path in x_batch], axis=0)
+        
+        yield x_batch, y_batch
+        
+train_generator = batch_data_generator(train_files, train_y)
+valid_generator = batch_data_generator(valid_files, valid_y)
+
+def plot_batch_of_examples(xs, ys, fig_width=20, n_cols=4, row_height=6):
+    assert len(xs.shape)==4
+    b,w,h,c = xs.shape
+    
+    n_rows     = int(np.ceil(b/n_cols))
+    fig_height = n_rows*row_height
+    
+    # Starting Point
+    plt.figure(figsize=(fig_width, fig_height))
+    
+    for i, (img, lbl) in enumerate(zip(xs,ys)):
+        plt.subplot(n_rows, n_cols, i+1)
+        plt.title(f"Label: {decoder(lbl)} ({lbl})", fontweight="bold")
+        plt.imshow(img)
+        plt.axis(False)
+    
+    # Ending Point
+    plt.tight_layout()
+    plt.show()
+    
+x,y = next(train_generator)
+plot_batch_of_examples(x,y)
+
