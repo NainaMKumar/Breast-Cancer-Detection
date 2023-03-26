@@ -1,0 +1,61 @@
+import pydicom
+
+import pandas as pd
+import numpy as np
+# import seaborn as sns
+import os
+import glob
+import plotly.express as px
+
+
+import matplotlib.pyplot as plt
+# from skimage.io import imsave
+from PIL import Image
+from tqdm.notebook import tqdm
+# from skimage.transform import resize
+from glob import glob
+import cv2
+
+#preprocessing
+from skimage import io, transform
+import tensorflow as tf
+
+d_train = pd.read_csv('/kaggle/input/rsna-breast-cancer-detection/train.csv')
+print("\n\nTrain Dataframe\n\n")
+display(d_train)
+
+d_test = pd.read_csv('/kaggle/input/rsna-breast-cancer-detection/test.csv')
+print("\n\nTest Dataframe\n\n")
+display(d_test)
+
+INPUT_DIR = os.path.join("/", "kaggle", "input")
+COMP_DIR = os.path.join(INPUT_DIR,"rsna-breast-cancer-detection")
+
+# Image directories
+TRAIN_IMG_DIR = os.path.join(COMP_DIR, "train_images")
+TEST_IMG_DIR = os.path.join(COMP_DIR, "test_images")
+
+# Csv paths
+TRAIN_CSV_PATH = os.path.join(COMP_DIR, "train.csv")
+TEST_CSV_PATH = os.path.join(COMP_DIR, "test.csv")
+SS_CSV_PATH = os.path.join(COMP_DIR, "sample_submission.csv")
+
+# Get all DCM information
+ALL_TRAIN_DCM_FILES = glob(os.path.join(TRAIN_IMG_DIR, "**", "*.dcm"))
+ALL_TEST_DCM_FILES = glob(os.path.join(TEST_IMG_DIR, "**", "*.dcm"))
+
+# Patient IDs
+TRAIN_PATIENT_IDS = [os.path.join(TRAIN_IMG_DIR, patient_id) for patient_id in sorted(os.listdir(TRAIN_IMG_DIR))]
+TEST_PATIENT_IDS = [os.path.join(TEST_IMG_DIR, patient_id) for patient_id in sorted(os.listdir(TEST_IMG_DIR))]
+
+d_train["dcm_path"] = d_train.apply(
+    lambda _row: os.path.join(TRAIN_IMG_DIR, str(_row["patient_id"]), str(_row["image_id"])+".dcm"), 
+    axis=1)
+display(d_train)
+
+d_test["dcm_path"] = d_test.apply(
+    lambda _row: os.path.join(TEST_IMG_DIR, str(_row["patient_id"]), str(_row["image_id"])+".dcm"), 
+    axis=1)
+display(d_test)
+
+
