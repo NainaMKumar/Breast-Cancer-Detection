@@ -1,0 +1,42 @@
+#define hyperparameters
+num_epochs = 10
+batch_size = 8
+learning_rate = 0.1
+
+resnet50 = tf.keras.applications.ResNet50(include_top=False, pooling="avg")
+resnet50.summary()
+
+def get_model(bb, dropout):
+    _inputs = bb.inputs
+    x = bb(_inputs)
+    x = tf.keras.layers.Dropout(dropout)(x)
+    _outputs = tf.keras.layers.Dense(1, activation="sigmoid")(x)
+    return tf.keras.Model(inputs=_inputs, outputs=_outputs)
+
+resnet50.trainable=False
+model = get_model(resnet50, 0.2)
+model.summary()
+
+train_ds = tf.data.Dataset.from_tensor_slices((train_files, train_y))\
+                          .map(lambda x,y: (tf_open_img(x), y))\
+                          .batch(8)\
+                          .shuffle(64)\
+                          .prefetch(tf.data.AUTOTUNE)
+valid_ds = tf.data.Dataset.from_tensor_slices((valid_files, valid_y))\
+                          .map(lambda x,y: (tf_open_img(x), y))\
+                          .batch(8)\
+                          .prefetch(tf.data.AUTOTUNE)
+                          
+from sklearn.utils import class_weight
+class_weights = class_weight.compute_class_weight('balanced', classes = np.unique(train_y), y = train_y)
+class_weights_dict = dict(enumerate(class_weights))
+
+model.compile(optimizer="adam", loss="binary_crossentropy", metrics = 'accuracy')
+hist = model.fit(train_ds, validation_data=valid_ds, epochs=16, class_weight = class_weights_dict)
+
+model.save("my model")
+my_model = tf.keras.models.load_model("my model")
+
+
+
+
